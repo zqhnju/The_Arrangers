@@ -17,7 +17,7 @@ tasks.txt   ─┘                schedule.json (给网页看)
 
 | 世界 | 内容 | 负责人 |
 |---|---|---|
-| **数据世界** | `Schedule` 结构体：7 天 × 96 格 | A（IO）：文本 ↔ 结构体 |
+| **数据世界** | `Schedule` 结构体：7 天 × 96 格 + 任务清单 + 课程清单 | A（IO）：文本 ↔ 结构体 |
 | **算法世界** | `cost()` 打分、`anneal()` 退火 | C：读写 `Schedule` 内存，反复优化 |
 | **展示世界** | JSON + HTML 彩色网格 | B：结构体 → JSON → 网页 |
 
@@ -59,6 +59,7 @@ tasks.txt   ─┘                schedule.json (给网页看)
 | `START_HOUR` | 8 | 每天从 8:00 开始 |
 | `LATE_NIGHT_START` | 90 | 槽 ≥ 90 算熬夜 |
 | `MAX_TASKS` | 64 | 任务数组容量 |
+| `MAX_COURSES` | 64 | 课程数组容量 |
 | `MAX_NAME` | 64 | 名字最长 63 字符 + `\0` |
 
 **不要写魔法数字**，一律用这些名字。
@@ -111,64 +112,77 @@ abs_index >= deadline_abs_exclusive   /* 超时 */
 - 输入用 `24:00` 表示当天结束，**不要写 `00:00`**。
 - 周日 24:00 截止是合法上界：`ddl = 6*96+96 = 672`，整周都算截止前。
 
-### 4. `Slot`：一个格子
+### 4. `Course`：一门已有课程
 
 ```c
 typedef struct {
-    int busy;         /* 1=课程，不可排任务 */
-    int task_index;   /* -1=空闲/课程；>=0=任务下标 */
+    char name[MAX_NAME];
+    int  day;
+    int  start_slot;
+    int  end_slot;      /* 边界排他：占用 [start, end) */
+} Course;
+```
+
+| 字段 | 谁写 | 谁读 |
+|---|---|---|
+| `name` | A | A、B |
+| `day` / `start_slot` / `end_slot` | A | A、B |
+
+**关键约定**：课程占用 `[start_slot, end_slot)`。
+
+- `08:00–09:40` → `start=0`、`end=10`，占槽 0~9，**槽 10 不占**。
+- `end_slot` 可以取 96（上到 24:00），但**不能写进 `slots[day][96]`**。
+
+**课程固定，退火不挪课程**。`Course` 和 `course_index` 只在 A 读/导出、B 显示时用。
+
+### 5. `Slot`：一个格子
+
+```c
+typedef struct {
+    int busy;           /* 1=课程，不可排任务 */
+    int course_index;   /* -1=不是课程；>=0=课程下标 */
+    int task_index;     /* -1=空闲；>=0=任务下标 */
 } Slot;
 ```
 
 **只有三种合法状态**：
 
-| 状态 | `busy` | `task_index` |
-|---|---|---|
-| 空闲 | 0 | -1 |
-| 课程 | 1 | -1 |
-| 任务 | 0 | i（≥0） |
+| 状态 | `busy` | `course_index` | `task_index` |
+|---|---|---|---|
+| 空闲 | 0 | -1 | -1 |
+| 课程 | 1 | k（≥0） | -1 |
+| 任务 | 0 | -1 | i（≥0） |
 
-课程看 `busy`，任务看 `task_index`，两者互斥。
+课程看 `busy=1` + `course_index>=0`，任务看 `task_index>=0`，三者互斥。
 
-### 5. `Schedule`：整张画布
+读到 `busy=1, course_index=-1` 或 `busy=0, course_index>=0` 都是 bug。
+
+### 6. `Schedule`：整张画布
 
 ```c
 typedef struct {
     Slot slots[7][96];
     Task tasks[64];
     int  task_count;
+    Course courses[64];
+    int  course_count;
 } Schedule;
 ```
 
-- `slots` 管**时间**，`tasks` 管**属性**，`task_index` 是两者的连接。
-- 遍历任务必须用 `task_count`，不能写 `MAX_TASKS`。
+- `slots` 管**时间**，`tasks` / `courses` 管**属性**，`task_index` / `course_index` 是两者的连接。
+- 遍历任务用 `task_count`，遍历课程用 `course_count`，不能写 `MAX_TASKS` / `MAX_COURSES`。
 
-### 6. 初始化：三个动作缺一不可
+### 7. 初始化：五个动作缺一不可
 
 | 动作 | 原因 |
 |---|---|
 | `slots[d][h].busy = 0` | 默认没课 |
+| `slots[d][h].course_index = -1` | 默认不是课程 |
 | `slots[d][h].task_index = -1` | 默认空闲 |
 | `task_count = 0` | 还没读任务 |
+| `course_count = 0` | 还没读课程 |
 
-**最大坑**：`memset(&s, 0, sizeof(s))` 会把 `task_index` 变成 **0**，导致“任务 0 占满全盘”。`busy` 和 `task_count` 可以 `memset`，`task_index` 必须循环置 `-1`。
-
-### 7. 可选扩展：存课程名
-
-当前 `Slot` 没有课程名字段。若要导出“高等数学”而不只是“课程”：
-
-```c
-typedef struct {
-    char name[MAX_NAME];
-    int  day, start_slot, end_slot;
-} Course;
-
-/* Schedule 增加：Course courses[MAX_COURSES]; int course_count; */
-/* Slot 增加：    int course_index;  // -1=不是课程 */
-```
-
-课程格状态变为 `{busy=1, course_index=k, task_index=-1}`。  
-**必须由 C 统一改 `scheduler.h` 后通知全员拉取**，`cost` 不受影响。
+**最大坑**：`memset(&s, 0, sizeof(s))` 会把 `course_index` 和 `task_index` 都变成 **0**，导致“课程 0 / 任务 0 占满全盘”。`busy`、两个 count 可以 `memset`，两个下标必须循环置 `-1`。
 
 ---
 
@@ -177,11 +191,11 @@ typedef struct {
 | 步 | 谁 | 做什么 |
 |---|---|---|
 | 1 | B | 运行 `scheduler.exe data/courses.txt data/tasks.txt out/` |
-| 2 | B | `main` 初始化空表（`task_index=-1`、`busy=0`、`task_count=0`） |
-| 3 | A | `load_existing_courses()`：把 `[start, end)` 区间 `busy=1`，`task_index` 保持 `-1` |
+| 2 | B | `main` 初始化空表：`busy=0`、`course_index=-1`、`task_index=-1`、`task_count=0`、`course_count=0` |
+| 3 | A | `load_existing_courses()`：`[start, end)` 区间写 `busy=1`、`course_index=k`；课程追加到 `courses[]`；`task_index` 保持 `-1` |
 | 4 | A | `load_tasks()`：分钟÷10 → `duration_slots`；`HH:MM` → `deadline_slot`；追加到 `tasks[]`。**此步不摆格子** |
 | 5 | C | `cost(&s)` → `c0` |
-| 6 | C | `Schedule best = anneal(s, 50000, 100.0, 0.9995, 0.01)`，按值返回新表，原表不变 |
+| 6 | C | `Schedule best = anneal(s, 50000, 100.0, 0.9995, 0.01)`，按值返回新表，原表不变；**只改任务格，课程不动** |
 | 7 | C | `cost(&best)` → `c1` |
 | 8 | A | `export_schedule_txt(&best, "out/schedule.txt")`；`export_schedule_json(&best, "out/schedule.json", c0, c1)`，同时生成 `web/viewer_data.js` |
 | 9 | B | 打开 `web/viewer.html`，加载 `viewer.css` + `viewer_data.js` + `viewer.js`，画 7×96 网格 |
@@ -194,16 +208,17 @@ typedef struct {
 
 ### 5.1 IO（A）
 
-- **读课程**：`[start, end)` → `busy=1`，用 `<` 不用 `<=`。
+- **读课程**：`[start, end)` → `busy=1` + `course_index=k`；课程追加到 `courses[]`。用 `<` 不用 `<=`。
 - **读任务**：只填 `tasks[]`，不摆格子。
-- **写文本**：按天、按任务两种视角汇总。
-- **写 JSON**：`courses[]` 和 `tasks[].assigned[]` 两个数组。
+- **写文本**：按天、按任务两种视角汇总；课程格通过 `course_index` 找课程名。
+- **写 JSON**：`courses[]`（带 `name`）和 `tasks[].assigned[]` 两个数组。
 
-**三个易错点**：
+**四个易错点**：
 
 1. 边界：`09:40` 是结束时间，不占槽 10。
 2. 校验：`09:05` 必须报错，不能取整。
-3. 初始化：`task_index` 默认必须 `-1`。
+3. 双写：课程格必须同时写 `busy=1` 和 `course_index=k`，只写 `busy` 导出时就没有课程名。
+4. 初始化：`course_index` 和 `task_index` 默认必须 `-1`。
 
 ### 5.2 算法（C）
 
@@ -218,8 +233,10 @@ typedef struct {
 | `penalty_work_time` | 连续工作过长/过短 |
 | `reward_rest_streak` | 超过 1 小时的连续休息 |
 
+> 当前 `content_id()` 把所有课程都当同一内容（返回 `-2`），**不同课程连续不算切换**。这不影响退火正确性；若要让 `work_fragmentation` 区分课程，改成 `return -1000 - course_index;`（值域别和任务 `0~63` 重叠）。改不改由 C 决定，不影响头文件。
+
 **`anneal`**：随机做小改动 → 算新分 → 变好就接受，变差按温度概率接受 → 降温 → 记录最优。  
-允许接受变差是为了跳出局部最优；温度越低越保守。
+允许接受变差是为了跳出局部最优；温度越低越保守。**只改任务格，不碰 `busy` / `course_index` / `courses[]`。**
 
 | 参数 | 变大 | 变小 |
 |---|---|---|
@@ -231,23 +248,24 @@ typedef struct {
 ### 5.3 主程序（B）
 
 ```text
-解析参数 → 初始化空表 → load_courses → load_tasks
+解析参数 → 初始化空表（五个动作） → load_courses → load_tasks
         → cost(c0) → anneal → cost(c1)
         → export_txt + export_json
 ```
 
 **核心责任**：顺序正确、每步检查返回值、出错给提示而不是崩。  
-**最大坑**：`memset` 清零会让 `task_index` 变 0。
+**最大坑**：`memset` 清零会让 `course_index` / `task_index` 变 0。
 
 ### 5.4 可视化（B）
 
 - HTML：标题、图例、7 列网格、统计区。
-- JS：遍历 `courses` 画灰块；遍历 `tasks[].assigned` 画彩色块（颜色按 `importance`）；填统计数字。
+- JS：遍历 `courses` 画灰块并显示 `name`；遍历 `tasks[].assigned` 画彩色块（颜色按 `importance`）；填统计数字。
 
-**两个易错点**：
+**三个易错点**：
 
 1. JSON 里是槽索引，显示前必须在 JS 里换算成 `HH:MM`。
 2. 同一任务可能有多段，画多个同色块，不连线。
+3. 课程名直接从 `courses[].name` 取，不要从 `slots` 反查。
 
 ---
 
@@ -285,18 +303,19 @@ main                 <- 稳定版本，只有 C 合并
 
 **合并顺序**：
 
-1. C 提交 `scheduler.h` + `io.h` 接口。
-2. A 实现 `io.c`，合并。
-3. B 写 `main.c` + `Makefile`，先注释 `anneal` 调用，只测 IO/导出，合并。
-4. C 提交 `cost.c` + `anneal.c`，合并。
-5. B 恢复 `anneal` 调用，跑全流程，写 `viewer.*`。
+1. C 提交 `scheduler.h` + `io.h` 接口（含 `Course` / `course_index` / `course_count`；**注意 `course_index` 后要写分号**）。
+2. A 实现 `io.c`：读课程双写 `busy` + `course_index` 并追加 `courses[]`；导出带课程名。合并。
+3. B 写 `main.c` + `Makefile`：初始化五个动作；先注释 `anneal`，只测 IO/导出。合并。
+4. C 提交 `cost.c` + `anneal.c`。合并。
+5. B 恢复 `anneal` 调用，跑全流程，写 `viewer.*`（课程块显示名字）。
 6. C 调参，A 补字段，B 更新演示。
 
-### 6.4 联调三看
+### 6.4 联调四看
 
-1. **JSON 字段**：`courses`、`tasks[].assigned` 是否与 `schedule.txt` 一致。
-2. **分数**：`c0`、`c1` 是否打印，`c1` 是否明显小于 `c0`。
-3. **网页**：课程灰、任务彩、23:00 后有红色区、统计数字与 `schedule.txt` 末尾一致。
+1. **课程字段**：`courses[]` 条数 = `courses.txt` 行数；每项有 `name` / `day` / `start` / `end`。
+2. **JSON 字段**：`tasks[].assigned` 是否与 `schedule.txt` 一致。
+3. **分数**：`c0`、`c1` 是否打印，`c1` 是否明显小于 `c0`。
+4. **网页**：课程灰且显示名字、任务彩、23:00 后有红色区、统计数字与 `schedule.txt` 末尾一致。
 
 ---
 
@@ -305,8 +324,10 @@ main                 <- 稳定版本，只有 C 合并
 | 误解 | 正确 |
 |---|---|
 | 任务读进来就该摆格子 | 读任务只填 `tasks[]`，摆格子是退火的事 |
-| 课程和任务都用 `busy=1` | 课程 `busy=1`，任务 `task_index>=0`，互斥 |
+| 课程只写 `busy=1` 就行 | 还要写 `course_index` 并追加 `courses[]`，否则导出没有课程名 |
+| 课程和任务都用 `busy=1` | 课程 `busy=1`+`course_index>=0`，任务 `task_index>=0`，互斥 |
 | 同一任务的格子一定连续 | 任务可拆到多天，只能靠 `task_index` 识别 |
+| 退火会挪课程 | 只挪任务；`busy`/`course_index`/`courses[]` 不变 |
 | 网页可以直接 `fetch('schedule.json')` | 本地 `file://` 会被拦截，必须用 `viewer_data.js` |
 | `anneal` 会修改传入的表 | 它内部复制，返回新表，原表不变 |
 | 调参就是随便改数字 | 每次只改一个参数，记录指标，有对比才有结论 |

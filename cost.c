@@ -1,7 +1,7 @@
 #include "scheduler.h"
 #include <stddef.h>
 
-#define DEADLINE_MISS_PENALTY 10
+#define DEADLINE_MISS_PENALTY 20
 #define LATE_NIGHT_PENALTY_PER_SLOT 2
 #define REST_FRAGMENTATION_PENALTY 3
 #define WORK_FRAGMENTATION_PENALTY 5
@@ -39,7 +39,7 @@ double penalty_deadline(const Schedule *s) {//错过deadline惩罚，错过越�
         }
 
         if(used > duration + 2){
-            total += (double)used / (double) duration * 0.3 * DEADLINE_MISS_PENALTY; //任务排太多也不是什么好事
+            total += ((double)used - (double) duration) * ((double)used - (double) duration) * 0.5 * DEADLINE_MISS_PENALTY; //任务排太多也不是什么好事
             continue;
         }
         if(used < duration){
@@ -211,7 +211,7 @@ double reward_rest_streak(const Schedule *s){ //长度超过一小时的休息�
                     rest_streak=24;
                 }
                 if(rest_streak > 6){
-                    double base = (rest_streak - 6) * (rest_streak - 6) / 36;
+                    double base = (rest_streak - 6) * (rest_streak - 6) / 36.0;
                     total += base * REST_STREAK_REWARD;
                 }
                 rest_streak = 0;
@@ -221,7 +221,7 @@ double reward_rest_streak(const Schedule *s){ //长度超过一小时的休息�
                     rest_streak=24;
                 }
         if(rest_streak > 0){
-            double score = rest_streak * rest_streak / 36 *0.5; //早睡奖励。这里不检查是否大于一小时是因为休息与睡眠时间合并，肯定超过一小时了。
+            double score = rest_streak * rest_streak / 36.0 *0.5; //早睡奖励。这里不检查是否大于一小时是因为休息与睡眠时间合并，肯定超过一小时了。
                 total += score * REST_STREAK_REWARD;
         }
     }

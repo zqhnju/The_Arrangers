@@ -4,6 +4,7 @@
 /* ---------- 基本常量 ---------- */
 #define MAX_TASKS 64
 #define MAX_NAME  64
+#define MAX_COURSES 64
 
 #define DAYS          7
 #define SLOTS_PER_DAY 96          /* 8:00–24:00，每 10 分钟一槽 */
@@ -21,14 +22,24 @@ typedef struct {
 } Task;
 
 typedef struct {
-    int busy;            /* 1=已有课程占用，不可安排任务 */
-    int task_index;      /* -1=空闲；否则为被安排任务的索引 */
+    char name[MAX_NAME];
+    int  day;
+    int  start_slot;
+    int  end_slot;
+} Course;
+
+typedef struct {
+    int busy;            // 1=已有课程占用，不可安排任务 
+    int course_index;     // -1=不是课程；>=0=课程索引
+    int task_index;      // -1=空闲；否则为被安排任务的索引 
 } Slot;
 
 typedef struct {
     Slot slots[DAYS][SLOTS_PER_DAY];
     Task tasks[MAX_TASKS];
     int task_count;
+    Course courses[MAX_COURSES];
+    int  course_count;
 } Schedule;
 
 /* ---------- 当前已实现的 cost 惩罚项 ---------- */

@@ -1,0 +1,156 @@
+:root {
+    color-scheme: light;
+    font-family: "Source Sans 3", "Microsoft YaHei", system-ui, sans-serif;
+    color: #172d3a;
+    background: #f2f5f7;
+    --border: #d5dfe5;
+    --muted: #4d6371;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+h1, h2, p, dl, dd { margin: 0; }
+[hidden] { display: none !important; }
+.container { width: min(94%, 78rem); margin-inline: auto; }
+main { padding-block: 1.5rem 3rem; }
+
+.page-header {
+    background: #143844;
+    color: #f5fbfd;
+    padding-block: 1.7rem 2rem;
+    border-bottom: 4px solid #3f9d97;
+}
+.project-name { color: #b8dcd9; font-size: 0.925rem; }
+h1 { margin-top: 0.25rem; font-size: clamp(2rem, 4vw, 3rem); }
+h2 { font-size: 1.35rem; }
+
+.notice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem 1rem;
+    background: #e3f2f1;
+    border-left: 3px solid #327f7b;
+}
+button {
+    background: #1e625f;
+    color: white;
+    font: inherit;
+    padding: 0.4rem 0.75rem;
+    border: 0;
+    border-radius: 0.35rem;
+    cursor: pointer;
+}
+:focus-visible { outline: 2px solid #135da0; outline-offset: 2px; }
+
+.metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+.metrics div {
+    padding: 0.8rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    background: white;
+}
+.metrics dt { color: var(--muted); font-size: 0.925rem; }
+.metrics dd { margin-top: 0.2rem; font-size: 1.4rem; font-weight: 700; }
+
+.schedule-heading, .legend, .legend li, .priority-swatches {
+    display: flex;
+    align-items: center;
+}
+.schedule-heading {
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    margin-bottom: 0.75rem;
+}
+.legend {
+    flex-wrap: wrap;
+    gap: 0.45rem 1rem;
+    margin: 0;
+    padding: 0;
+    color: var(--muted);
+    font-size: 0.875rem;
+    list-style: none;
+}
+.legend li { gap: 0.35rem; }
+.priority-swatches { gap: 2px; }
+.swatch { width: 0.85rem; height: 0.85rem; border-radius: 2px; }
+
+.schedule-scroll {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 0.55rem;
+}
+.week {
+    --slot-height: 0.95rem;
+    --hour-height: calc(var(--slot-height) * 6);
+    display: grid;
+    grid-template-columns: 4.25rem repeat(7, minmax(6rem, 1fr));
+    background: white;
+}
+.column { min-width: 0; }
+.column + .column { border-left: 1px solid var(--border); }
+.column-heading {
+    margin: 0;
+    padding: 0.65rem 0.3rem;
+    background: #e5edef;
+    text-align: center;
+    font-size: 0.9rem;
+}
+.slots {
+    display: grid;
+    grid-template-rows: repeat(96, var(--slot-height));
+}
+.day .slots {
+    background-image:
+        repeating-linear-gradient(to bottom, #cbd7df 0 1px, transparent 1px var(--hour-height)),
+        repeating-linear-gradient(to bottom, #edf2f5 0 1px, transparent 1px var(--slot-height));
+}
+.time-label {
+    padding: 0.08rem 0.4rem;
+    color: var(--muted);
+    text-align: right;
+    font: 0.825rem ui-monospace, monospace;
+}
+.late {
+    background: repeating-linear-gradient(135deg, #fce6e6 0 4px, #fff2f2 4px 8px);
+}
+.slots > .late, .event { grid-column: 1; }
+.event {
+    z-index: 1;
+    min-width: 0;
+    margin-inline: 2px;
+    padding-inline: 0.36rem;
+    border-left: 3px solid var(--accent);
+    border-radius: 0.22rem;
+    background: var(--event-bg);
+    color: #192836;
+    font-size: 0.8rem;
+    line-height: var(--slot-height);
+    overflow: hidden;
+}
+.event-name, .event-time {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.event-name { font-weight: 700; }
+.event-time { font-size: 0.75rem; }
+.course { --accent: #637782; --event-bg: #dde4e8; background-color: var(--event-bg); }
+.priority-1 { --accent: #276c91; --event-bg: #c4e2f0; background-color: var(--event-bg); }
+.priority-2 { --accent: #27775c; --event-bg: #bde6d5; background-color: var(--event-bg); }
+.priority-3 { --accent: #8a650a; --event-bg: #f8e3a3; background-color: var(--event-bg); }
+.priority-4 { --accent: #a14421; --event-bg: #f5c8ab; background-color: var(--event-bg); }
+.priority-5 { --accent: #9b365e; --event-bg: #efbfd3; background-color: var(--event-bg); }
+
+@media (max-width: 38rem) {
+    .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

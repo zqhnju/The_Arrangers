@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>一周排程 · The Arrangers</title>
+    <link rel="stylesheet" href="viewer.css">
+    <script src="viewer_data.js" defer></script>
+    <script src="viewer_demo_data.js" defer></script>
+    <script src="viewer.js" defer></script>
+</head>
+<body>
+    <header class="page-header">
+        <div class="container">
+            <p class="project-name">The Arrangers 项目组</p>
+            <h1>一周排程</h1>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="notice" id="notice">
+            <p id="data-status" role="status">等待排程数据。请从项目根目录运行排程程序，再刷新此页。</p>
+            <button id="show-demo" type="button" hidden>查看示例排程</button>
+        </div>
+
+        <section aria-label="排程统计">
+            <dl class="metrics">
+                <div><dt>初始评分</dt><dd id="initial-cost">—</dd></div>
+                <div><dt>最终评分</dt><dd id="final-cost">—</dd></div>
+                <div><dt>已排任务时长</dt><dd id="scheduled-minutes">—</dd></div>
+                <div><dt>熬夜任务槽数</dt><dd id="late-slots">—</dd></div>
+            </dl>
+        </section>
+
+        <section aria-labelledby="schedule-heading">
+            <div class="schedule-heading">
+                <h2 id="schedule-heading">周计划表</h2>
+                <ul class="legend" aria-label="图例">
+                    <li><span class="swatch course"></span>课程</li>
+                    <li>
+                        <span class="priority-swatches" aria-hidden="true">
+                            <span class="swatch priority-1"></span>
+                            <span class="swatch priority-2"></span>
+                            <span class="swatch priority-3"></span>
+                            <span class="swatch priority-4"></span>
+                            <span class="swatch priority-5"></span>
+                        </span>
+                        任务重要度 1–5
+                    </li>
+                    <li><span class="swatch late"></span>23:00 后</li>
+                </ul>
+            </div>
+            <div class="schedule-scroll" role="region" aria-label="一周时间网格" tabindex="0">
+                <div class="week" id="week"></div>
+            </div>
+        </section>
+    </main>
+</body>
+</html>
